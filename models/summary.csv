@@ -1,0 +1,5 @@
+classifier,flow_mode,accuracy,precision,recall,f1,roc_auc
+rf,early,0.9001,0.9016,0.9001,0.9007,0.9684
+xgb,early,0.892,0.8928,0.892,0.8924,0.9614
+rf,full,0.9001,0.9016,0.9001,0.9007,0.9684
+xgb,full,0.892,0.8928,0.892,0.8924,0.9614
