@@ -1,0 +1,33 @@
+# Core ML
+numpy==2.3.5
+pandas==2.3.3
+scikit-learn==1.8.0
+xgboost==3.2.0
+joblib==1.5.3
+
+# Explainability
+shap==0.50.0
+
+# Visualisation
+matplotlib==3.10.8
+seaborn==0.13.2
+
+# Dashboard
+streamlit==1.55.0
+plotly==6.6.0
+
+# API
+fastapi==0.129.0
+uvicorn==0.40.0
+pydantic==2.12.5
+
+# Network analysis
+scapy==2.7.0
+
+# Testing
+pytest==8.3.5
+pytest-cov==6.1.0
+httpx==0.28.1
+
+# Optional — install separately if using CICFlowMeter CSV:
+# pyshark>=0.6   (needs tshark / Wireshark)
