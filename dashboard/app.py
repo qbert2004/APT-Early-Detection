@@ -96,7 +96,7 @@ def _load_summary() -> pd.DataFrame | None:
     return pd.read_csv(SUMMARY_CSV)
 
 
-def _load_sensitivity() -> pd.DataFrame | None:
+def _load_sensitivity() -> Path | None:
     img = MODELS_DIR / "n_packets_sensitivity.png"
     return img if img.exists() else None
 
@@ -240,31 +240,31 @@ elif page == "Model Metrics":
     st.subheader("N-Packets Sensitivity")
     sens_img = _load_sensitivity()
     if sens_img and sens_img.exists():
-        st.image(str(sens_img), use_column_width=True)
+        st.image(str(sens_img), use_container_width=True)
     else:
         st.info("Run `python -m ml.evaluate_model` to generate this plot.")
 
     roc_all = MODELS_DIR / "roc_all_models.png"
     if roc_all.exists():
         st.subheader("ROC Curves — All Models")
-        st.image(str(roc_all), use_column_width=True)
+        st.image(str(roc_all), use_container_width=True)
 
     st.subheader("ROC Curves (per model)")
     for roc_img in sorted(MODELS_DIR.glob("*_roc.png")):
-        st.image(str(roc_img), caption=roc_img.stem, use_column_width=False, width=550)
+        st.image(str(roc_img), caption=roc_img.stem, width=550)
 
     st.subheader("Confusion Matrices")
     for cm_img in sorted(MODELS_DIR.glob("*_cm.png")):
-        st.image(str(cm_img), caption=cm_img.stem, use_column_width=False, width=500)
+        st.image(str(cm_img), caption=cm_img.stem, width=500)
 
     st.subheader("Feature Importances")
     for fi_img in sorted(MODELS_DIR.glob("*_importance.png")):
-        st.image(str(fi_img), caption=fi_img.stem, use_column_width=False, width=600)
+        st.image(str(fi_img), caption=fi_img.stem, width=600)
 
     comp = MODELS_DIR / "comparison_full_vs_early.png"
     if comp.exists():
         st.subheader("Full vs Early — Comparison Chart")
-        st.image(str(comp), use_column_width=True)
+        st.image(str(comp), use_container_width=True)
 
 # ── page: SHAP Explanations ────────────────────────────────────────────────────
 
@@ -288,7 +288,7 @@ elif page == "SHAP Explanations":
         )
     else:
         st.subheader("Global Feature Impact (Beeswarm)")
-        st.image(str(bee), use_column_width=True)
+        st.image(str(bee), use_container_width=True)
         st.caption(
             "Each dot = one test flow. Color = feature value (red = high, blue = low). "
             "X-axis = SHAP value: how much the feature shifted the prediction."
@@ -305,7 +305,7 @@ elif page == "SHAP Explanations":
             cols = st.columns(2)
             for k, img in enumerate(wf_imgs):
                 with cols[k % 2]:
-                    st.image(str(img), caption=img.stem, use_column_width=True)
+                    st.image(str(img), caption=img.stem, use_container_width=True)
         else:
             st.info("No waterfall plots found.")
 
