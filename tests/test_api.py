@@ -107,6 +107,14 @@ class TestPredictEarly:
         probs = r.json()["probabilities"]
         assert abs(sum(probs.values()) - 1.0) < 1e-5
 
+    def test_probabilities_contains_all_classes(self, client):
+        """Regression: binary model must still return all 3 class keys (attack=0.0)."""
+        r = client.post("/predict/early", json=EARLY_PAYLOAD)
+        probs = r.json()["probabilities"]
+        for cls in CLASSES:
+            assert cls in probs, f"Missing class '{cls}' in probabilities dict"
+            assert 0.0 <= probs[cls] <= 1.0
+
     def test_latency_is_positive(self, client):
         r = client.post("/predict/early", json=EARLY_PAYLOAD)
         assert r.json()["latency_ms"] > 0

@@ -152,6 +152,21 @@ def _run_inference(mdl, df: pd.DataFrame) -> tuple[int, np.ndarray]:
     return label_id, proba
 
 
+def _build_proba_dict(mdl, proba: np.ndarray) -> dict[str, float]:
+    """Map model output probabilities to all known class labels.
+
+    Handles both binary (classes_=[0,1]) and 3-class models.  Any class that
+    the model was not trained on receives probability 0.0 so the response dict
+    always contains exactly the keys in CLASSES — no silent truncation.
+    """
+    mapping = {
+        CLASSES[int(c)]: float(p)
+        for c, p in zip(mdl.classes_, proba)
+        if int(c) < len(CLASSES)
+    }
+    return {cls: mapping.get(cls, 0.0) for cls in CLASSES}
+
+
 # ── endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["ops"])
@@ -188,7 +203,7 @@ def predict_early(body: EarlyFlowFeatures) -> PredictionResponse:
         label=label,
         label_id=label_id,
         confidence=float(proba[label_id]),
-        probabilities={c: float(p) for c, p in zip(CLASSES, proba)},
+        probabilities=_build_proba_dict(mdl, proba),
         model_used=key,
         latency_ms=round(latency, 3),
     )
@@ -219,7 +234,7 @@ def predict_full(body: FullFlowFeatures) -> PredictionResponse:
         label=label,
         label_id=label_id,
         confidence=float(proba[label_id]),
-        probabilities={c: float(p) for c, p in zip(CLASSES, proba)},
+        probabilities=_build_proba_dict(mdl, proba),
         model_used=key,
         latency_ms=round(latency, 3),
     )
