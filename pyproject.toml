@@ -1,0 +1,19 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["api", "features", "ml", "data", "realtime", "utils"]
+omit   = ["tests/*", "*/conftest.py", "run_all.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under   = 60
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "W", "F"]
+ignore = ["E501"]

@@ -1,5 +1,9 @@
 # APT Early Detection
 
+![CI](https://github.com/qbert2004/APT-Early-Detection/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 Real-time network traffic classifier that detects **VPN tunnelling and anomalous flows** from only the **first 5 packets** of a connection — before the full flow completes.
 
 Built for a diploma thesis on ML-based early intrusion detection.
@@ -35,10 +39,23 @@ Training uses the **ISCX VPN-nonVPN 2016** dataset (combined):
 
 ## Model Performance (115K-flow dataset)
 
-| Model | F1 (weighted) | AUC |
+Тестовая выборка 30%, стратифицированная, `random_state=42`:
+
+| Model | F1 (weighted) | AUC-ROC |
 |-------|:---:|:---:|
 | RF early  | **0.9007** | **0.9684** |
 | XGB early | 0.8924 | 0.9614 |
+| RF full   | 0.9007 | 0.9684 |
+| XGB full  | 0.8924 | 0.9614 |
+
+5-кратная кросс-валидация (F1-weighted, `StratifiedKFold`):
+
+| Model | CV F1 mean ± std |
+|-------|:---:|
+| RF early  | см. вывод `train_model.py` |
+| XGB early | см. вывод `train_model.py` |
+
+Подробный анализ: [docs/EVALUATION.md](docs/EVALUATION.md)
 
 ---
 
@@ -212,6 +229,16 @@ This project uses **SHAP TreeExplainer** for model interpretability:
 
 ---
 
+## Documentation
+
+| Документ | Содержание |
+|----------|-----------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектура системы, компоненты, поток данных |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Методология, результаты, SHAP-анализ, ограничения |
+| [CHANGELOG.md](CHANGELOG.md) | История версий |
+
+---
+
 ## License
 
-MIT
+MIT — см. [LICENSE](LICENSE)
