@@ -41,6 +41,9 @@ sys.path.insert(0, str(ROOT))
 from realtime.flow_builder import FlowBuilder, FlowKey
 from features.feature_extractor import LABEL_MAP_INV, EARLY_FEATURES
 from utils.logger import get_logger
+from utils.notifier import TelegramNotifier
+from utils.threat_intel import ThreatIntel
+from realtime.baseline_scanner import BaselineChecker
 
 log = get_logger(__name__)
 
@@ -59,40 +62,81 @@ RESET = "\033[0m"
 
 class AlertEngine:
     def __init__(self, threshold: float = 0.65):
-        self.threshold   = threshold
+        self.threshold    = threshold
         self._callbacks: list[Callable] = []
-        self._log_fh     = open(ALERT_LOG, "a", buffering=1)
+        self._log_fh      = open(ALERT_LOG, "a", buffering=1, encoding="utf-8")
+        self._notifier     = TelegramNotifier(threshold=threshold)
+        self._threat_intel = ThreatIntel()
+        self._baseline     = BaselineChecker()
 
     def register(self, fn: Callable):
         self._callbacks.append(fn)
 
     def emit(self, flow_key: FlowKey, label: str, proba: float, features: dict):
-        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        ts  = time.strftime("%Y-%m-%d %H:%M:%S")
         src = f"{flow_key[0]}:{flow_key[1]}"
         dst = f"{flow_key[2]}:{flow_key[3]}"
-        color = CLASS_COLOR.get(label, "")
+        src_ip = flow_key[0]
+        color  = CLASS_COLOR.get(label, "")
+
+        # ── Baseline check: unknown host bonus ────────────────────────────
+        host_bonus = self._baseline.risk_bonus(src_ip)
+
+        # ── Threat Intel enrichment (only for attacks to save API quota) ──
+        ip_risk    = None
+        hybrid     = min(proba + host_bonus, 1.0)
+        risk_label = ""
+        if label == "attack" and proba >= self.threshold:
+            result     = self._threat_intel.hybrid_risk(proba, src_ip)
+            ip_risk    = result["ip_risk"]
+            hybrid     = min(result["hybrid_score"] + host_bonus, 1.0)
+            risk_label = self._threat_intel.risk_label(hybrid)
+
+        # ── console line ──────────────────────────────────────────────────
+        intel_str = ""
+        if ip_risk is not None:
+            intel_str = f"  ip_risk={ip_risk}/100  hybrid={hybrid:.3f}  [{risk_label}]"
 
         line = (f"[{ts}] {color}{label.upper():8s}{RESET}"
                 f"  prob={proba:.3f}"
                 f"  {src} → {dst}"
                 f"  pkts={int(features['packet_count'])}"
-                f"  bytes={int(features['total_bytes'])}")
+                f"  bytes={int(features['total_bytes'])}"
+                f"{intel_str}")
         print(line)
+
         try:
-            clean = line.replace("\033[92m","").replace("\033[93m","") \
-                        .replace("\033[91m","").replace("\033[0m","")
+            clean = (line.replace("\033[92m","").replace("\033[93m","")
+                        .replace("\033[91m","").replace("\033[0m",""))
             self._log_fh.write(clean + "\n")
 
             if label == "attack" and proba >= self.threshold:
-                alert = f"  [!] ALERT: suspicious flow from {src} (confidence {proba:.1%})"
+                alert = (f"  [!] ALERT: suspicious flow from {src}"
+                         f"  confidence={proba:.1%}  hybrid_risk={hybrid:.1%}"
+                         f"  [{risk_label}]")
                 print(f"\033[91m{alert}{RESET}")
                 self._log_fh.write(alert + "\n")
-                log.warning("attack detected", src=src, dst=dst, confidence=round(proba, 4))
+                log.warning(
+                    "attack detected",
+                    src=src, dst=dst,
+                    confidence=round(proba, 4),
+                    ip_risk=ip_risk,
+                    hybrid_score=round(hybrid, 4),
+                    risk_label=risk_label,
+                )
+
+                # ── Telegram notification ─────────────────────────────────
+                self._notifier.notify_attack(
+                    src=src, dst=dst, prob=proba,
+                    ip_risk=ip_risk, features=features,
+                )
         except ValueError:
             pass  # file closed during shutdown
 
         for cb in self._callbacks:
-            cb(label=label, proba=proba, flow_key=flow_key, features=features, ts=ts)
+            cb(label=label, proba=proba, flow_key=flow_key,
+               features=features, ts=ts,
+               ip_risk=ip_risk, hybrid_score=hybrid)
 
     def close(self):
         self._log_fh.close()
@@ -112,7 +156,8 @@ class MLClassifier:
                 )
             model_path = candidates[0]
 
-        self.model = joblib.load(model_path)
+        self.model      = joblib.load(model_path)
+        self.model_path = model_path          # stored for startup notification
         print(f"[detector] model loaded: {model_path}")
         log.info("detector model loaded", path=str(model_path))
 
@@ -246,6 +291,10 @@ class Detector:
 
         # stats
         self.counts: dict[str, int] = {"normal": 0, "vpn": 0, "attack": 0}
+
+        # notify Telegram that detector is up
+        model_name = str(self.clf.model_path) if hasattr(self.clf, "model_path") else "best_early"
+        self.alerts._notifier.send_startup([model_name])
 
     def _on_flow_ready(self, flow_key: FlowKey, features: dict):
         try:

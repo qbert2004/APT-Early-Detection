@@ -24,6 +24,9 @@ pydantic==2.12.5
 # Network analysis
 scapy==2.7.0
 
+# Threat Intelligence + Telegram notifications
+requests==2.32.3
+
 # Testing
 pytest==8.3.5
 pytest-cov==6.1.0

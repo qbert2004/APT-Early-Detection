@@ -13,10 +13,11 @@ Usage:
 """
 from __future__ import annotations
 
+import csv
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 import joblib
 import numpy as np
@@ -30,8 +31,12 @@ from utils.logger import get_logger
 log = get_logger(__name__)
 
 # ── paths ──────────────────────────────────────────────────────────────────────
-ROOT = Path(__file__).parent.parent
-MODELS_DIR = ROOT / "models"
+ROOT         = Path(__file__).parent.parent
+MODELS_DIR   = ROOT / "models"
+FEEDBACK_CSV = MODELS_DIR / "feedback.csv"
+
+_FEEDBACK_FIELDS = ["ts", "src", "dst", "model_label", "confidence",
+                    "analyst_verdict", "analyst_note"]
 
 EARLY_FEATURES = [
     "avg_packet_size", "std_packet_size", "min_packet_size", "max_packet_size",
@@ -122,6 +127,23 @@ class PredictionResponse(BaseModel):
     probabilities: dict[str, float]
     model_used:  str
     latency_ms:  float
+
+
+class FeedbackRequest(BaseModel):
+    src:             str   = Field(..., description="Source IP:port from the alert")
+    dst:             str   = Field(..., description="Destination IP:port from the alert")
+    model_label:     str   = Field(..., description="Label the model predicted")
+    confidence:      float = Field(..., ge=0, le=1)
+    analyst_verdict: Literal["true_positive", "false_positive", "unknown"] = Field(
+        ..., description="Analyst's assessment"
+    )
+    analyst_note:    Optional[str] = Field(None, description="Free-text note")
+
+
+class FeedbackResponse(BaseModel):
+    accepted:   bool
+    feedback_id: int
+    message:    str
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -241,6 +263,56 @@ def predict_full(body: FullFlowFeatures) -> PredictionResponse:
     log.info("prediction", mode="full", label=label, confidence=resp.confidence,
              latency_ms=resp.latency_ms, model=key)
     return resp
+
+
+@app.post("/feedback", response_model=FeedbackResponse, tags=["feedback"])
+def submit_feedback(body: FeedbackRequest) -> FeedbackResponse:
+    """
+    Analyst feedback endpoint — mark a detected flow as TP / FP.
+    Saves to models/feedback.csv for future model improvement.
+    """
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    row = {
+        "ts":              ts,
+        "src":             body.src,
+        "dst":             body.dst,
+        "model_label":     body.model_label,
+        "confidence":      round(body.confidence, 4),
+        "analyst_verdict": body.analyst_verdict,
+        "analyst_note":    body.analyst_note or "",
+    }
+
+    write_header = not FEEDBACK_CSV.exists()
+    try:
+        with open(FEEDBACK_CSV, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=_FEEDBACK_FIELDS)
+            if write_header:
+                writer.writeheader()
+            writer.writerow(row)
+        feedback_id = sum(1 for _ in open(FEEDBACK_CSV, encoding="utf-8")) - 1
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {exc}")
+
+    log.info("feedback received", verdict=body.analyst_verdict,
+             src=body.src, model_label=body.model_label)
+
+    msg = {
+        "true_positive":  "Confirmed as attack — recorded for model improvement.",
+        "false_positive": "Marked as false positive — will be used to reduce noise.",
+        "unknown":        "Feedback recorded as inconclusive.",
+    }.get(body.analyst_verdict, "Feedback recorded.")
+
+    return FeedbackResponse(accepted=True, feedback_id=feedback_id, message=msg)
+
+
+@app.get("/feedback/stats", tags=["feedback"])
+def feedback_stats() -> dict:
+    """Return summary stats from the feedback CSV."""
+    if not FEEDBACK_CSV.exists():
+        return {"total": 0, "true_positive": 0, "false_positive": 0, "unknown": 0}
+    df = pd.read_csv(FEEDBACK_CSV)
+    counts = df["analyst_verdict"].value_counts().to_dict()
+    return {"total": len(df), **counts}
 
 
 @app.get("/metrics", response_class=PlainTextResponse, tags=["ops"])

@@ -25,17 +25,14 @@ services:
       start_period: 20s
 
   dashboard:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
     container_name: apt_dashboard
-    working_dir: /app
-    command: >
-      sh -c "pip install -q streamlit==1.55.0 plotly==6.6.0 pandas==2.3.3 numpy==2.3.5
-             matplotlib==3.10.8 scikit-learn==1.8.0 joblib==1.5.3 shap==0.50.0 &&
-             streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0"
     ports:
       - "8501:8501"
     volumes:
-      - .:/app:ro
+      - ./models:/app/models:ro
     depends_on:
       api:
         condition: service_healthy
