@@ -48,14 +48,7 @@ Training uses the **ISCX VPN-nonVPN 2016** dataset (combined):
 | RF full   | 0.9007 | 0.9684 |
 | XGB full  | 0.8924 | 0.9614 |
 
-5-кратная кросс-валидация (F1-weighted, `StratifiedKFold`):
-
-| Model | CV F1 mean ± std |
-|-------|:---:|
-| RF early  | см. вывод `train_model.py` |
-| XGB early | см. вывод `train_model.py` |
-
-Подробный анализ: [docs/EVALUATION.md](docs/EVALUATION.md)
+**5-кратная кросс-валидация** (`StratifiedKFold`, `f1_weighted`) — результаты сохраняются в `models/cv_results.json` после прогона `train_model.py`. Полная разбивка по фолдам и анализ — [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ---
 
@@ -122,6 +115,49 @@ streamlit run dashboard/app.py
 ```
 
 Visit: http://localhost:8501
+
+### 8. Live packet capture (real-time detection)
+
+Требуется [Npcap](https://npcap.com/) (при установке включите **WinPcap API-compatible Mode**).
+
+```bash
+# Живой перехват на Wi-Fi (15 секунд)
+python -X utf8 -m realtime.detector --iface "\\Device\\NPF_{...}" --duration 15
+
+# Демо-режим (синтетические потоки, без Npcap)
+python -X utf8 -m realtime.detector --demo --duration 20
+
+# Реплей pcap-файла
+python -X utf8 -m realtime.detector --pcap captures/sample.pcap
+```
+
+Пример вывода (реальный Wi-Fi трафик):
+
+```
+[detector] model loaded: models/best_early_model.pkl
+[capture] sniffing on \Device\NPF_{...} …  (Ctrl-C to stop)
+[2026-05-04 16:16:37] NORMAL    prob=0.576  192.168.101.6:61619 → 52.168.117.168:443  pkts=5  bytes=2111
+[2026-05-04 16:16:37] VPN       prob=0.668  192.168.101.6:61619 → 52.168.117.168:443  pkts=5  bytes=6570
+[2026-05-04 16:16:38] NORMAL    prob=0.816  160.79.104.10:443  → 192.168.101.6:56859  pkts=5  bytes=387
+[2026-05-04 16:16:42] NORMAL    prob=0.702  155.133.229.4:443  → 192.168.101.6:59132  pkts=5  bytes=1008
+────────────────────────────────────────
+  Flows classified: 19
+  normal    :    11  (57.9%)
+  vpn       :     8  (42.1%)
+─────────────��──────────────────────────
+```
+
+**Архитектура real-time пайплайна:**
+
+```
+PacketCapture (Scapy/Npcap)
+    ↓
+FlowBuilder (собирает первые 5 пакетов в поток)
+    ��
+MLClassifier (RF .pkl → predict + predict_proba)
+    ↓
+AlertEngine (консоль + alerts.log + Telegram + ThreatIntel)
+```
 
 ---
 
@@ -224,8 +260,9 @@ This project uses **SHAP TreeExplainer** for model interpretability:
 ## Requirements
 
 - Python 3.11+ (developed on Python 3.14)
-- 7-Zip (for Deflate64-compressed PCAP ZIPs): https://www.7-zip.org/
-- Scapy (for PCAP extraction): `pip install scapy`
+- [Npcap](https://npcap.com/) 1.87+ — для живого перехвата пакетов (при установке включить **WinPcap API-compatible Mode**)
+- 7-Zip (для Deflate64-compressed PCAP ZIPs): https://www.7-zip.org/
+- Scapy 2.7+ (для PCAP extraction и live capture): `pip install scapy`
 
 ---
 

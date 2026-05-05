@@ -153,10 +153,18 @@ def _save(name: str, model, metrics: dict):
 
 # ── cross-validation report ────────────────────────────────────────────────────
 
-def _cv_report(name: str, model, X: pd.DataFrame, y: pd.Series):
+def _cv_report(name: str, model, X: pd.DataFrame, y: pd.Series) -> dict:
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     scores = cross_val_score(model, X, y, cv=cv, scoring="f1_weighted", n_jobs=-1)
     print(f"  [CV] {name}  F1 = {scores.mean():.4f} ± {scores.std():.4f}")
+    return {
+        "model": name,
+        "n_splits": 5,
+        "scoring": "f1_weighted",
+        "mean": float(scores.mean()),
+        "std": float(scores.std()),
+        "scores": [float(s) for s in scores],
+    }
 
 
 # ── main ────────────────────────────────────────────────────────────────────────
@@ -237,10 +245,16 @@ def train(
     print("  CROSS-VALIDATION (5-fold, F1-weighted)")
     print("="*60)
 
+    cv_results: dict[str, dict] = {}
     for flow_mode, (X_tr, _) in datasets.items():
         for clf_name, clf in classifiers.items():
             tag = f"{clf_name}_{flow_mode}"
-            _cv_report(tag, clf, X_tr, y_train)
+            cv_results[tag] = _cv_report(tag, clf, X_tr, y_train)
+
+    cv_path = MODELS_DIR / "cv_results.json"
+    with open(cv_path, "w", encoding="utf-8") as f:
+        json.dump(cv_results, f, indent=2)
+    print(f"\n  CV results saved → {cv_path}")
 
     print("\n" + "="*60)
     print("  HELD-OUT TEST SET EVALUATION")
