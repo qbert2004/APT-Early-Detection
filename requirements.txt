@@ -1,36 +1,42 @@
-# Core ML
+# APT Early Detection — Requirements
+# Tested on Python 3.14 / 3.11+
+# Install: pip install -r requirements.txt
+# Windows live capture: install Npcap (https://npcap.com) with WinPcap-compatible mode
+
+# ─── Core ML ─────────────────────────────────────────────────────────────────
 numpy==2.3.5
 pandas==2.3.3
-scikit-learn==1.8.0
+scikit-learn==1.8.0          # pinned: trained models use 1.8.0
 xgboost==3.2.0
 joblib==1.5.3
 
-# Explainability
+# ─── Explainability ──────────────────────────────────────────────────────────
 shap==0.50.0
 
-# Visualisation
+# ─── Visualisation ───────────────────────────────────────────────────────────
 matplotlib==3.10.8
 seaborn==0.13.2
 
-# Dashboard
+# ─── Dashboard ───────────────────────────────────────────────────────────────
 streamlit==1.55.0
 plotly==6.6.0
 
-# API
+# ─── API ─────────────────────────────────────────────────────────────────────
 fastapi==0.129.0
 uvicorn==0.40.0
 pydantic==2.12.5
 
-# Network analysis
-scapy==2.7.0
+# ─── Network capture & analysis ──────────────────────────────────────────────
+scapy==2.7.0                 # live capture requires Npcap (Windows) or libpcap (Linux)
 
-# Threat Intelligence + Telegram notifications
-requests==2.32.3
+# ─── Threat Intelligence + Telegram notifications ────────────────────────────
+requests==2.32.5
+python-dotenv==1.2.1         # .env file loading for API keys
 
-# Testing
-pytest==8.3.5
-pytest-cov==6.1.0
-httpx==0.28.1
+# ─── Testing ─────────────────────────────────────────────────────────────────
+pytest==9.0.2
+pytest-cov==7.0.0
+httpx==0.28.1                # async test client for FastAPI
 
-# Optional — install separately if using CICFlowMeter CSV:
-# pyshark>=0.6   (needs tshark / Wireshark)
+# ─── Optional ────────────────────────────────────────────────────────────────
+# pyshark>=0.6               # CICFlowMeter CSV parsing (needs tshark / Wireshark)
